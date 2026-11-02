@@ -271,16 +271,18 @@ impl Message for BuffRemoved {
     }
 }
 
-/// S→C `0x01eb`: a buff is added (reader `0x141f6bd70`, **partial**): header, `u16 index`
-/// (slot id chosen by the server, grows per buff), `u16 buff row` (BuffDefinitions row; the
-/// sprint buffs are 2758 = `0xac6`, 2737 = `0xab1`, 2853 = `0xb25`), `u32`, `u16`, `u16
-/// flags`, then optional fields by flag: `0x01` varuint + u32 + u8 + u16; `0x02` u32 (f32
-/// duration; the sprint update re-sends buff `0xac6` with `0x3dcccccd` = 0.1); `0x04` u16;
-/// `0x08` u16 + u32 + u8; `0x20` u8; `0x80` u32 (f32); a final `u32 n` and `n` x `u32`.
-/// Flag `0x10` and fields that depend on the buff definition (a `u16` when the definition has
-/// a flag at +0xfe, `n` extra `u32`s when it has one at +0x7c) are not handled: the decoder
-/// rejects flag `0x10` and assumes the definition flags are clear, which holds for the three
-/// sprint buffs.
+/// S→C `0x01eb`: a buff is added (reader `0x141f6bd70`): header, `u16 index` (slot id chosen
+/// by the server, grows per buff), `u16 buff row` (BuffDefinitions row; the sprint buffs are
+/// 2758 = `0xac6`, 2737 = `0xab1`, 2853 = `0xb25`), `u32`, `u16`, `u16 flags`, then optional
+/// fields by flag in this order: `0x01` varuint + u32 + u8 + u16; `0x02` u32 (f32 duration;
+/// the sprint update re-sends buff `0xac6` with `0x3dcccccd` = 0.1); `0x80` u32 (f32); `0x04`
+/// u16; `0x08` u16 + u32 + u8; `0x10` u16 (a BuffVisuals row replacing the definition's
+/// `BuffVisual`); `0x20` u8. Flags `0x40` and `0x100` carry no data. Then two fields that the
+/// buff's BuffDefinitions row decides ([`BuffShape`]): a `u16` when the bool column at row
+/// byte `0xfe` (schema column 43, unnamed) is set, and one `u32` per `GrantedStats` entry
+/// (their values) when the bool at byte `0x7c` (schema `IsRecovery`) is set. Last a `u32 n`
+/// and `n` x `u32`. [`Message::decode`] assumes both definition bools clear (true for the
+/// sprint buffs); use [`BuffAdded::decode_with`] for other buffs.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct BuffAdded {
     pub header: SimulationHeader,
@@ -293,9 +295,24 @@ pub struct BuffAdded {
     pub flag_02: Option<u32>,
     pub flag_04: Option<u16>,
     pub flag_08: Option<(u16, u32, u8)>,
+    /// BuffVisuals row (flag `0x10`).
+    pub flag_10: Option<u16>,
     pub flag_20: Option<u8>,
     pub flag_80: Option<u32>,
+    /// The `u16` sent when the definition's byte `0xfe` is set.
+    pub def_u16: Option<u16>,
+    /// The `GrantedStats` values sent when the definition's byte `0x7c` is set.
+    pub stat_values: Vec<u32>,
     pub extra: Vec<u32>,
+}
+
+/// What a buff's BuffDefinitions row adds to [`BuffAdded`]: `has_u16` = the bool at row byte
+/// `0xfe`; `stat_values` = `len(GrantedStats)` when the bool at byte `0x7c` (`IsRecovery`) is
+/// set, else 0.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct BuffShape {
+    pub has_u16: bool,
+    pub stat_values: usize,
 }
 
 impl BuffAdded {
@@ -306,10 +323,57 @@ impl BuffAdded {
         f |= if self.flag_02.is_some() { 0x02 } else { 0 };
         f |= if self.flag_04.is_some() { 0x04 } else { 0 };
         f |= if self.flag_08.is_some() { 0x08 } else { 0 };
+        f |= if self.flag_10.is_some() { 0x10 } else { 0 };
         f |= if self.flag_20.is_some() { 0x20 } else { 0 };
         f |= if self.flag_80.is_some() { 0x80 } else { 0 };
-        self.flags = f;
+        self.flags = (self.flags & !0xbf) | f;
         self
+    }
+
+    /// Decodes with the definition-dependent fields of `shape` (the buff row's flags).
+    pub fn decode_with(r: &mut Reader<'_>, shape: BuffShape) -> Result<Self, DecodeError> {
+        let header = SimulationHeader::decode(r)?;
+        let mut m = Self {
+            header,
+            index: r.u16()?,
+            buff: r.u16()?,
+            unk_64: r.u32()?,
+            unk_60: r.u16()?,
+            flags: r.u16()?,
+            ..Default::default()
+        };
+        if m.flags & 0x01 != 0 {
+            m.flag_01 = Some((r.varuint()?, r.u32()?, r.u8()?, r.u16()?));
+        }
+        if m.flags & 0x02 != 0 {
+            m.flag_02 = Some(r.u32()?);
+        }
+        if m.flags & 0x80 != 0 {
+            m.flag_80 = Some(r.u32()?);
+        }
+        if m.flags & 0x04 != 0 {
+            m.flag_04 = Some(r.u16()?);
+        }
+        if m.flags & 0x08 != 0 {
+            m.flag_08 = Some((r.u16()?, r.u32()?, r.u8()?));
+        }
+        if m.flags & 0x10 != 0 {
+            m.flag_10 = Some(r.u16()?);
+        }
+        if m.flags & 0x20 != 0 {
+            m.flag_20 = Some(r.u8()?);
+        }
+        if shape.has_u16 {
+            m.def_u16 = Some(r.u16()?);
+        }
+        for _ in 0..shape.stat_values.min(1024) {
+            m.stat_values.push(r.u32()?);
+        }
+        let n = r.u32()?;
+        for _ in 0..n.min(1024) {
+            m.extra.push(r.u32()?);
+        }
+        Ok(m)
     }
 }
 
@@ -338,8 +402,17 @@ impl Message for BuffAdded {
         if let Some((a, b, c)) = self.flag_08 {
             w.u16(a).u32(b).u8(c);
         }
+        if let Some(v) = self.flag_10 {
+            w.u16(v);
+        }
         if let Some(v) = self.flag_20 {
             w.u8(v);
+        }
+        if let Some(v) = self.def_u16 {
+            w.u16(v);
+        }
+        for &v in &self.stat_values {
+            w.u32(v);
         }
         w.u32(self.extra.len() as u32);
         for &v in &self.extra {
@@ -347,45 +420,7 @@ impl Message for BuffAdded {
         }
     }
     fn decode(r: &mut Reader<'_>) -> Result<Self, DecodeError> {
-        let header = SimulationHeader::decode(r)?;
-        let mut m = Self {
-            header,
-            index: r.u16()?,
-            buff: r.u16()?,
-            unk_64: r.u32()?,
-            unk_60: r.u16()?,
-            flags: r.u16()?,
-            ..Default::default()
-        };
-        if m.flags & 0x10 != 0 {
-            return Err(DecodeError::Invalid {
-                offset: r.position(),
-                what: "BuffAdded flag 0x10 (not decoded)",
-            });
-        }
-        if m.flags & 0x01 != 0 {
-            m.flag_01 = Some((r.varuint()?, r.u32()?, r.u8()?, r.u16()?));
-        }
-        if m.flags & 0x02 != 0 {
-            m.flag_02 = Some(r.u32()?);
-        }
-        if m.flags & 0x80 != 0 {
-            m.flag_80 = Some(r.u32()?);
-        }
-        if m.flags & 0x04 != 0 {
-            m.flag_04 = Some(r.u16()?);
-        }
-        if m.flags & 0x08 != 0 {
-            m.flag_08 = Some((r.u16()?, r.u32()?, r.u8()?));
-        }
-        if m.flags & 0x20 != 0 {
-            m.flag_20 = Some(r.u8()?);
-        }
-        let n = r.u32()?;
-        for _ in 0..n.min(1024) {
-            m.extra.push(r.u32()?);
-        }
-        Ok(m)
+        Self::decode_with(r, BuffShape::default())
     }
 }
 
@@ -505,6 +540,40 @@ mod tests {
         }
         .with_flags();
         assert_eq!(built, upd);
+    }
+
+    /// A buff whose definition has both flags (e.g. row 1 `chilled`: byte 0xfe set, one
+    /// `GrantedStats` entry with byte 0x7c set), with flag 0x10 (BuffVisuals row) and 0x20.
+    #[test]
+    fn buff_definition_fields() {
+        let shape = BuffShape {
+            has_u16: true,
+            stat_values: 1,
+        };
+        let built = BuffAdded {
+            index: 7,
+            buff: 1,
+            flag_02: Some(0x4000_0000),
+            flag_10: Some(0x0123),
+            flag_20: Some(1),
+            def_u16: Some(0x0040),
+            stat_values: vec![30],
+            extra: vec![5],
+            ..Default::default()
+        }
+        .with_flags();
+        assert_eq!(built.flags, 0x32);
+        let mut w = Writer::new();
+        built.encode(&mut w);
+        let bytes = w.as_slice().to_vec();
+        let mut r = Reader::new(&bytes);
+        assert_eq!(BuffAdded::decode_with(&mut r, shape).unwrap(), built);
+        assert!(r.is_empty());
+        // Order after the flags: 0x02 f32, 0x10 u16, 0x20 u8, definition u16, stat values, n.
+        let tail = &bytes[bytes.len() - 21..];
+        assert_eq!(tail[..4], [0x40, 0, 0, 0]);
+        assert_eq!(tail[4..7], [0x01, 0x23, 0x01]);
+        assert_eq!(tail[7..9], [0x00, 0x40]);
     }
 
     #[test]
