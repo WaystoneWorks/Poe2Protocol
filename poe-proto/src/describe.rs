@@ -95,6 +95,8 @@ pub fn describe(name: &str, direction: Direction, body: &[u8]) -> Option<Describ
         instance::UpdateSkillTargetEntity,
         instance::UpdateActionTarget,
         instance::SetOrientation,
+        instance::OrientationLerp,
+        instance::StanceRequest,
         instance::SprintInput,
         instance::SprintState,
         instance::StatsUpdate,

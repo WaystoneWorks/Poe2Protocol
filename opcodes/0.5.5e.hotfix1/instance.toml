@@ -28,7 +28,9 @@ ExitReport = 0x0355
 ChatSend = 0x0016
 # Not decoded yet (sizes from single-message batches, 2026-10-14).
 Unknown00fe = 0x00fe
-Unknown0200 = 0x0200
+# Stance request (input mode toggle, the first skill use in mouse mode): u8 local player,
+# u8 value (1 mouse mode, 4 combat); sent with AimTarget mode 0/1.
+StanceRequest = 0x0200
 # Pause/resume request (escape menu in a solo game): u8, u8 paused.
 PauseRequest = 0x01ff
 # Join a chat channel (global/trade) after entering an area.
@@ -94,6 +96,8 @@ ActionEvent = 0x01ca
 UpdateActionTarget = 0x01cb
 # Positioned: facing angle + lock (the server turns the player toward the cursor with it).
 SetOrientation = 0x01df
+# Orientation lerp time with every stance change (read by the 0x01df reader): f32, u8.
+OrientationLerp = 0x02a6
 # An entity's sprint key state (dodge roll -> sprint).
 SprintState = 0x02e7
 # An entity's stats change (Stats component).
@@ -144,5 +148,4 @@ SkillInputEnd = 1
 Unknown0351 = 1
 Unknown0016 = 5
 Unknown00fe = 2
-Unknown0200 = 2
 Unknown0357 = 1

@@ -241,6 +241,19 @@ mod tests {
     }
 
     #[test]
+    fn stance_messages_match_capture() {
+        // 2026-10-20 f3286/f3287 (bodies after the opcode): 0x200 value 1, 0x2a6 0.2.
+        let r: StanceRequest = decode_all(&[0x01, 0x01]);
+        assert_eq!((r.player, r.value), (1, 1));
+        let bytes = [0, 0, 0, 0x65, 0, 0, 0, 0, 0, 0, 0, 0x3e, 0x4c, 0xcc, 0xcd, 0];
+        let l: OrientationLerp = decode_all(&bytes);
+        assert_eq!((l.header.entity_id, l.value, l.flag), (0x65, 0.2, 0));
+        let mut w = Writer::new();
+        l.encode(&mut w);
+        assert_eq!(w.into_vec(), bytes);
+    }
+
+    #[test]
     fn move_direction_matches_capture() {
         // Captured 2026-10-14 (bodies after the 0x0063 opcode): W, then release; D; S.
         let w: MoveDirection = decode_all(&[0x00, 0x80, 0x7f, 0x80, 0x7f, 0, 0, 0]);
@@ -1325,6 +1338,57 @@ impl Message for SetOrientation {
             header: SimulationHeader::decode(r)?,
             angle: f32::from_bits(r.u32()?),
             locked: r.u8()? != 0,
+        })
+    }
+}
+
+/// S→C simulation message (`0x2a6`, read by the `0x1df` reader `0x141f6b080`): header, `f32
+/// value, u8`. Official servers send it with every stance change of the player, before the
+/// Player delta: `0.05` when the stance goes to combat, `0.2` when it goes to 0 (eight
+/// sessions; the name is a guess from the reader it shares with [`SetOrientation`]).
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct OrientationLerp {
+    pub header: SimulationHeader,
+    pub value: f32,
+    pub flag: u8,
+}
+
+impl Message for OrientationLerp {
+    const NAME: &'static str = "OrientationLerp";
+    const DIRECTION: Direction = Direction::Server;
+    fn encode(&self, w: &mut Writer) {
+        self.header.encode(w);
+        w.u32(self.value.to_bits()).u8(self.flag);
+    }
+    fn decode(r: &mut Reader<'_>) -> Result<Self, DecodeError> {
+        Ok(Self {
+            header: SimulationHeader::decode(r)?,
+            value: f32::from_bits(r.u32()?),
+            flag: r.u8()?,
+        })
+    }
+}
+
+/// C→S `0x200`: `u8 local player, u8 value`, sent with `AimTarget` mode 0 or 1 when the input
+/// mode is toggled (value 1 = click-to-move, mode 0; value 4 = WASD, mode 1) and with the
+/// first skill use in mouse mode (value 4). The server echoes the value in the Player delta
+/// (`0x1000`, +0x3e7).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct StanceRequest {
+    pub player: u8,
+    pub value: u8,
+}
+
+impl Message for StanceRequest {
+    const NAME: &'static str = "StanceRequest";
+    const DIRECTION: Direction = Direction::Client;
+    fn encode(&self, w: &mut Writer) {
+        w.u8(self.player).u8(self.value);
+    }
+    fn decode(r: &mut Reader<'_>) -> Result<Self, DecodeError> {
+        Ok(Self {
+            player: r.u8()?,
+            value: r.u8()?,
         })
     }
 }

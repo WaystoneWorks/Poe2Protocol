@@ -112,7 +112,7 @@ instance	0x0222		e4b030b85ff54bd6	1	0x141f4b800
 instance	0x0223		22a88bbf3b029a1d	1	0x141f6aeb0
 instance	0x02a4		ec4ae8a53177cc23	1	0x141f6b6c0
 instance	0x02a5		bb998ac0f6dd0bdc	3	0x141f6b810
-instance	0x02a6		ef7b08ad6104e566	1	0x141f6b080
+instance	0x02a6	OrientationLerp	ef7b08ad6104e566	1	0x141f6b080
 instance	0x026f		3e24015d6e099e45	1	0x141f69b10
 instance	0x0270		e1b3fc0a4ace5a63	1	0x142186840
 instance	0x01fb		03b37fde513ab205	1	0x141f6a9b0
