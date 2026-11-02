@@ -26,8 +26,10 @@ LeaveGame = 0x001b
 ExitReport = 0x0355
 # A typed chat line: u8, wstring text, u8.
 ChatSend = 0x0016
-# Not decoded yet (sizes from single-message batches, 2026-10-14).
-Unknown00fe = 0x00fe
+# Weapon set swap: u8 local player, u8 set index (sender 0x1421150d0, cycled by 0x142114f60).
+# In lockstep the client changes nothing itself and blocks skills and swaps (session +0x7a90)
+# until SetWeaponSet and WeaponSetSwapDone arrive (docs/protocol/movement.md).
+WeaponSetSwap = 0x00fe
 # Stance request (input mode toggle, the first skill use in mouse mode): u8 local player,
 # u8 value (1 mouse mode, 4 combat); sent with AimTarget mode 0/1.
 StanceRequest = 0x0200
@@ -102,6 +104,10 @@ OrientationLerp = 0x02a6
 SprintState = 0x02e7
 # An entity's stats change (Stats component).
 StatsUpdate = 0x01d3
+# Stats component: current weapon set (header, u8 set; vfunc +0xf0 0x141dfc590 -> Stats +0x168).
+SetWeaponSet = 0x01d5
+# Session message ending a weapon swap (clears session +0x7a90, case 0xff of 0x142106bb0): u8 1.
+WeaponSetSwapDone = 0x00ff
 # Stats of one of an actor's skills change.
 SkillStatsUpdate = 0x01d8
 # Player component acknowledgements of the client's skill messages (absolute target cells).
@@ -147,5 +153,5 @@ Unknown02e8 = 2
 SkillInputEnd = 1
 Unknown0351 = 1
 Unknown0016 = 5
-Unknown00fe = 2
+WeaponSetSwap = 2
 Unknown0357 = 1

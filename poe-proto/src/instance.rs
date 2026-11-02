@@ -254,6 +254,21 @@ mod tests {
     }
 
     #[test]
+    fn weapon_swap_matches_capture() {
+        // 2026-10-20_18-41-14 seq 6829/6832/6833 (bodies after the opcode).
+        let s: WeaponSetSwap = decode_all(&[0x01, 0x01]);
+        assert_eq!((s.player, s.set), (1, 1));
+        let bytes = [0, 0, 0, 0x65, 0, 0, 0, 0, 0, 0, 0, 0x01];
+        let set: SetWeaponSet = decode_all(&bytes);
+        assert_eq!((set.header.entity_id, set.set), (0x65, 1));
+        let mut w = Writer::new();
+        set.encode(&mut w);
+        assert_eq!(w.into_vec(), bytes);
+        let done: WeaponSetSwapDone = decode_all(&[0x01]);
+        assert_eq!(done.unk, 1);
+    }
+
+    #[test]
     fn move_direction_matches_capture() {
         // Captured 2026-10-14 (bodies after the 0x0063 opcode): W, then release; D; S.
         let w: MoveDirection = decode_all(&[0x00, 0x80, 0x7f, 0x80, 0x7f, 0, 0, 0]);
@@ -1436,6 +1451,72 @@ impl Message for SprintState {
             header: SimulationHeader::decode(r)?,
             held: r.u8()? != 0,
         })
+    }
+}
+
+/// C→S: switch to weapon set `set` (sender `0x1421150d0`; `0x142114f60` cycles to the next
+/// non-empty set): `u8 local player, u8 set`. In lockstep the client sets session `+0x7a90`
+/// (no skill use `0x1a5`, skill key or further swap until it clears) and changes nothing else
+/// until [`SetWeaponSet`] and [`WeaponSetSwapDone`] arrive.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct WeaponSetSwap {
+    pub player: u8,
+    pub set: u8,
+}
+
+impl Message for WeaponSetSwap {
+    const NAME: &'static str = "WeaponSetSwap";
+    const DIRECTION: Direction = Direction::Client;
+    fn encode(&self, w: &mut Writer) {
+        w.u8(self.player).u8(self.set);
+    }
+    fn decode(r: &mut Reader<'_>) -> Result<Self, DecodeError> {
+        Ok(Self {
+            player: r.u8()?,
+            set: r.u8()?,
+        })
+    }
+}
+
+/// S→C simulation message: the entity's current weapon set (reader `0x141f69b10`, Stats
+/// component handler `0x1421820a0` case `0x1d5` -> Stats vfunc `+0xf0` `0x141dfc590`, which
+/// ignores an index at or above the set count and stores it at Stats `+0x168`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SetWeaponSet {
+    pub header: SimulationHeader,
+    pub set: u8,
+}
+
+impl Message for SetWeaponSet {
+    const NAME: &'static str = "SetWeaponSet";
+    const DIRECTION: Direction = Direction::Server;
+    fn encode(&self, w: &mut Writer) {
+        self.header.encode(w);
+        w.u8(self.set);
+    }
+    fn decode(r: &mut Reader<'_>) -> Result<Self, DecodeError> {
+        Ok(Self {
+            header: SimulationHeader::decode(r)?,
+            set: r.u8()?,
+        })
+    }
+}
+
+/// S→C session message: the weapon swap is over (`Session_HandleAccountMessage` `0x142106bb0`
+/// case `0xff` clears session `+0x7a90`). Official servers send `u8 1` after [`SetWeaponSet`].
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct WeaponSetSwapDone {
+    pub unk: u8,
+}
+
+impl Message for WeaponSetSwapDone {
+    const NAME: &'static str = "WeaponSetSwapDone";
+    const DIRECTION: Direction = Direction::Server;
+    fn encode(&self, w: &mut Writer) {
+        w.u8(self.unk);
+    }
+    fn decode(r: &mut Reader<'_>) -> Result<Self, DecodeError> {
+        Ok(Self { unk: r.u8()? })
     }
 }
 
