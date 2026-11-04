@@ -65,6 +65,10 @@ backend_errors! {
     INVALID_CHARACTER_FLAGS = 27, "InvalidCharacterFlags";
     /// Create: no free character slot.
     TOO_MANY_CHARACTERS = 49, "TooManyCharacters";
+    /// Create: the league has ended.
+    LEAGUE_HAS_ENDED = 55, "LeagueHasEnded";
+    /// Create: the league is closed for new characters (our hidden leagues).
+    LEAGUE_CLOSED_FOR_ENTRY = 56, "LeagueClosedForEntry";
     /// Login: banned (our disabled accounts).
     ACCOUNT_BANNED = 71, "AccountBanned";
     /// Login: too many password attempts ("You have attempted to log in too often within a
@@ -73,6 +77,8 @@ backend_errors! {
     /// Login: "Your saved credentials are out of date. Please re-enter your password."
     /// The client keeps its credentials file, so the token is retried on the next start.
     SAVED_CREDENTIALS_BAD = 97, "SavedCredentialsBad";
+    /// Create: the league's start time has not come.
+    LEAGUE_NOT_YET_STARTED = 139, "LeagueNotYetStarted";
 }
 
 #[cfg(test)]

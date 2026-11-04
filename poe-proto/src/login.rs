@@ -531,30 +531,32 @@ impl Message for CharacterList {
 /// Text fields must not be empty; meanings of the later fields are provisional.
 #[derive(Debug, Clone, Default)]
 pub struct LeagueEntry {
-    /// Internal id, e.g. "Standard" (client +0x10).
+    /// League id, e.g. "Standard" (client +0x10); characters and CreateCharacter carry it.
     pub id: String,
-    /// Display name (client +0x40).
+    /// Display name (client +0x40); official sends a `#League...` text key.
     pub name: String,
-    /// client +0x60
+    /// client +0x60: an SSF variant names its non-SSF sibling here (SSF -> base, HC SSF -> HC);
+    /// the creation banner pairs the SSF checkbox through it (`0x140e7ca80`). Empty otherwise.
     pub text_60: String,
-    /// client +0x80
+    /// client +0x80: a Hardcore variant names its softcore sibling here (HC -> base,
+    /// HC SSF -> SSF); the Hardcore checkbox. Empty otherwise.
     pub text_80: String,
-    /// client +0xa0
+    /// client +0xa0: a third pairing slot (Ruthless in the shared code); empty officially.
     pub text_a0: String,
-    /// client +0xd0 (start time?)
+    /// client +0xd0: start time, unix seconds.
     pub time_d0: u64,
-    /// client +0xd8 (end time?)
+    /// client +0xd8: early-access start time, used instead of +0xd0 when +0xe0 bit 5 is set.
     pub time_d8: u64,
-    /// client +0xc8
+    /// client +0xc8: end time, unix seconds (0 = none; checked when +0xe0 bit 4 is set).
     pub time_c8: u64,
-    /// client +0xe0: bitfield. Byte 0 bit 1 = hardcore (red banner, `0x140ecaed9`);
-    /// byte 1 bit 5 and byte 2 bit 2 are also tested by the UI (meaning TBD).
+    /// client +0xe0: bitfield, see docs/protocol/login.md (LeagueEntry).
     pub raw_e0: [u8; 3],
     /// client +0xc0
     pub flag_c0: u8,
-    /// client +0xc1: league category id compared by the select screen (0x39 = none?).
+    /// client +0xc1: league category (`LeagueCategoryToDisplayName.Id`); 1 (Standard) is the
+    /// banner preselected at character creation.
     pub flag_c1: u8,
-    /// client +0xc2
+    /// client +0xc2: `LeagueFlag` row + 1 of the creation banner (`0x140e77810`).
     pub flag_c2: u8,
 }
 
