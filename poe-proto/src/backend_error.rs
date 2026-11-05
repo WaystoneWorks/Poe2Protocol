@@ -77,6 +77,10 @@ backend_errors! {
     /// Login: "Your saved credentials are out of date. Please re-enter your password."
     /// The client keeps its credentials file, so the token is retried on the next start.
     SAVED_CREDENTIALS_BAD = 97, "SavedCredentialsBad";
+    /// Migration: a character of the request is in game ("This account is currently online.").
+    ACCOUNT_IS_ONLINE = 384, "AccountIsOnline";
+    /// Migration: no move from this league ("You cannot migrate from this league at the moment.").
+    LEAGUE_DISALLOWS_MANUAL_MIGRATION = 526, "LeagueDisallowsManualMigration";
     /// Create: the league's start time has not come.
     LEAGUE_NOT_YET_STARTED = 139, "LeagueNotYetStarted";
 }

@@ -632,6 +632,122 @@ impl Message for LeagueList {
     }
 }
 
+/// C→S: the League Migrations window asks what can be migrated (sender `0x140f0a2d0`, class
+/// `0x143506270`). Reply: [`LeaguesWithProgress`].
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct RequestLeaguesWithProgress {
+    pub account_id: u32,
+}
+
+impl Message for RequestLeaguesWithProgress {
+    const NAME: &'static str = "RequestLeaguesWithProgress";
+    const DIRECTION: Direction = Direction::Client;
+    fn encode(&self, w: &mut Writer) {
+        w.u32(self.account_id);
+    }
+    fn decode(r: &mut Reader<'_>) -> Result<Self, DecodeError> {
+        Ok(Self {
+            account_id: r.u32()?,
+        })
+    }
+}
+
+/// S→C: the League Migrations window's list (deserializer `0x14214ea40`, class `0x143509f38`,
+/// handler `0x140f0b660`). `leagues` holds pairs: `[from, to, from, to, ...]`.
+#[derive(Debug, Clone, Default)]
+pub struct LeaguesWithProgress {
+    /// 0, else a `BackendErrors` code: the client closes the window and shows the error.
+    pub result: u16,
+    pub leagues: Vec<LeagueEntry>,
+}
+
+impl Message for LeaguesWithProgress {
+    const NAME: &'static str = "LeaguesWithProgress";
+    const DIRECTION: Direction = Direction::Server;
+    fn encode(&self, w: &mut Writer) {
+        w.u16(self.result).u32(self.leagues.len() as u32);
+        for l in &self.leagues {
+            l.encode(w);
+        }
+    }
+    fn decode(r: &mut Reader<'_>) -> Result<Self, DecodeError> {
+        let result = r.u16()?;
+        let count = r.u32()?;
+        let leagues = (0..count)
+            .map(|_| LeagueEntry::decode(r))
+            .collect::<Result<_, _>>()?;
+        Ok(Self { result, leagues })
+    }
+}
+
+/// C→S: Migrate on one character of the window (sender `0x1420eac10`, class `0x1435061f0`).
+/// The message names no target league: the server decides.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct MigrateCharacter {
+    pub name: String,
+    pub account_id: u32,
+}
+
+impl Message for MigrateCharacter {
+    const NAME: &'static str = "MigrateCharacter";
+    const DIRECTION: Direction = Direction::Client;
+    fn encode(&self, w: &mut Writer) {
+        w.astring(&self.name).u32(self.account_id);
+    }
+    fn decode(r: &mut Reader<'_>) -> Result<Self, DecodeError> {
+        Ok(Self {
+            name: r.astring()?,
+            account_id: r.u32()?,
+        })
+    }
+}
+
+/// C→S: Migrate All on one league of the window (sender `0x1420ead40`, same class as
+/// [`MigrateCharacter`]). `league` is the id of the pair's first entry.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct MigrateLeague {
+    pub league: String,
+    pub account_id: u32,
+}
+
+impl Message for MigrateLeague {
+    const NAME: &'static str = "MigrateLeague";
+    const DIRECTION: Direction = Direction::Client;
+    fn encode(&self, w: &mut Writer) {
+        w.astring(&self.league).u32(self.account_id);
+    }
+    fn decode(r: &mut Reader<'_>) -> Result<Self, DecodeError> {
+        Ok(Self {
+            league: r.astring()?,
+            account_id: r.u32()?,
+        })
+    }
+}
+
+/// S→C reply to [`MigrateCharacter`] and [`MigrateLeague`] (class `0x143509f18`, handler
+/// `0x140f0b3e0`). Non-zero: the client shows "Migration Failed" with the code's text. Zero
+/// does nothing in the client: the server sends the new lists itself.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct MigrationResult {
+    /// 0 = moved, else a `BackendErrors` code ([`crate::backend_error`]).
+    pub result: u16,
+    pub account_id: u32,
+}
+
+impl Message for MigrationResult {
+    const NAME: &'static str = "MigrationResult";
+    const DIRECTION: Direction = Direction::Server;
+    fn encode(&self, w: &mut Writer) {
+        w.u16(self.result).u32(self.account_id);
+    }
+    fn decode(r: &mut Reader<'_>) -> Result<Self, DecodeError> {
+        Ok(Self {
+            result: r.u16()?,
+            account_id: r.u32()?,
+        })
+    }
+}
+
 /// Create a character (client serializer `0x1420e4cc0`, built in `0x1420e9ce0`).
 #[derive(Debug, Clone)]
 pub struct CreateCharacter {
