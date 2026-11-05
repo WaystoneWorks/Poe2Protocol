@@ -209,6 +209,8 @@ pub struct Player {
     pub unk_1d4: u32,
     /// Flags bit 0: the "WashedUp" opening animation (new characters on the Riverbank).
     pub washed_up: bool,
+    /// The quest flags as (chunk, bits): flag `f` is bit `f & 63` of chunk `f >> 6`.
+    pub quest_flags: Vec<(u8, u64)>,
 }
 
 impl Player {
@@ -218,8 +220,15 @@ impl Player {
             .u32_le(self.unk_u32)
             .u32_le(self.unk_1d0)
             .u32_le(self.unk_1d4)
-            // u16 +0x200, u16 +0x202, two empty (u8, u64) lists, 5 bytes, two u16 data keys.
-            .bytes(&[0; 2 + 2 + 2 + 2 + 5 + 2 + 2])
+            // u16 +0x200, u16 +0x202.
+            .bytes(&[0; 2 + 2])
+            // The quest flags (Player +0x248), by chunk: flag >> 6 (docs/re/world-travel.md).
+            .u16_le(self.quest_flags.len() as u16);
+        for (chunk, bits) in &self.quest_flags {
+            w.u8(*chunk).bytes(&bits.to_le_bytes());
+        }
+        // An empty (u8, u64) list, 5 bytes, two u16 data keys.
+        w.bytes(&[0; 2 + 5 + 2 + 2])
             // Flags (bit 0: washed up).
             .u8(self.washed_up as u8)
             // u8, u8, varuint count of u32s, u8 count.
@@ -431,5 +440,84 @@ mod tests {
         actor.encode(&mut w);
         assert_eq!(w.as_slice()[19], 1);
         assert_eq!(w.len(), 48 + expect.len());
+    }
+}
+
+/// What follows the art path in a travel object's blob (captured, not decoded:
+/// docs/re/world-travel.md in the hub).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ObjectTail {
+    /// A gate: the area it leads to and its place among the gates to that area.
+    Gate {
+        area_hash: u16,
+        index: u8,
+    },
+    Waypoint,
+    Checkpoint,
+    /// Never captured: a checkpoint's tail, for the same components without its `ControlZone`.
+    Well,
+}
+
+/// The `AddObject` blob of a fog gate, waypoint or checkpoint: flags, `n` = 0, Positioned, Animated
+/// and the type's tail. `ao` is the art path.
+pub fn travel_object_blob((x, y): (i32, i32), angle: f32, ao: &str, tail: ObjectTail) -> Vec<u8> {
+    let mut b = vec![ENTITY_IN_WAKE_ZONE, 0];
+    b.extend(x.to_le_bytes());
+    b.extend(y.to_le_bytes());
+    b.extend(angle.to_le_bytes());
+    match tail {
+        // The flag 4 part (`00000000 0000c040`) of every captured checkpoint.
+        ObjectTail::Checkpoint => b.extend([0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0xc0, 0x40]),
+        _ => b.extend([0, 0, 0, 0, 0]),
+    }
+    b.push(0x41);
+    let wide: Vec<u16> = ao.encode_utf16().collect();
+    b.extend((wide.len() as u32).to_le_bytes());
+    b.extend(wide.iter().flat_map(|c| c.to_le_bytes()));
+    b.push(0);
+    match tail {
+        ObjectTail::Gate { area_hash, index } => {
+            b.push(2);
+            b.extend(area_hash.to_le_bytes());
+            b.push(index);
+            // Six zero bytes in `G1_town`, five in `G1_2` and `G1_3` (unexplained).
+            b.extend([0; 5]);
+            b.extend([1, 8, 0, 0, 0, 0, 1, 0, 0, 0]);
+        }
+        ObjectTail::Waypoint => b.extend([1, 0]),
+        ObjectTail::Checkpoint | ObjectTail::Well => b.extend([2, 0, 0, 0, 0, 0, 0]),
+    }
+    b
+}
+
+#[cfg(test)]
+mod travel_object_tests {
+    use super::*;
+
+    #[test]
+    fn a_waypoint_blob_ends_as_captured() {
+        let b = travel_object_blob((282, 252), 6.2, "x.ao", ObjectTail::Waypoint);
+        assert_eq!(&b[..2], [ENTITY_IN_WAKE_ZONE, 0]);
+        assert_eq!(&b[b.len() - 3..], [0, 1, 0]);
+        // Positioned head: team and flags.
+        assert_eq!(&b[14..19], [0; 5]);
+        assert_eq!(b[19], 0x41);
+    }
+
+    #[test]
+    fn a_gate_blob_ends_as_the_capture_of_g1_2() {
+        let b = travel_object_blob(
+            (449, 474),
+            std::f32::consts::PI,
+            "x.ao",
+            ObjectTail::Gate {
+                area_hash: 0x3f70,
+                index: 0,
+            },
+        );
+        let tail = [
+            0, 2, 0x70, 0x3f, 0, 0, 0, 0, 0, 0, 1, 8, 0, 0, 0, 0, 1, 0, 0, 0,
+        ];
+        assert_eq!(&b[b.len() - tail.len()..], tail);
     }
 }

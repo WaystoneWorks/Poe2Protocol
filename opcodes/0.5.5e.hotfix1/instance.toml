@@ -26,6 +26,12 @@ LeaveGame = 0x001b
 ExitReport = 0x0355
 # A typed chat line: u8, wstring text, u8.
 ChatSend = 0x0016
+# Waypoint chosen in the World panel: u8 local, u16 HASH16, u32 entity, u8 flags (bit 7 ctrl).
+WaypointChoice = 0x005b
+# Choice in the instance list: u8 local, u8 index (0xff new, inferred).
+InstanceChoice = 0x00cf
+# Checkpoint travel button of the area map: u8 local, u8 index of WarpList (never captured).
+WarpRequest = 0x0353
 # Weapon set swap: u8 local player, u8 set index (sender 0x1421150d0, cycled by 0x142114f60).
 # In lockstep the client changes nothing itself and blocks skills and swaps (session +0x7a90)
 # until SetWeaponSet and WeaponSetSwapDone arrive (docs/protocol/movement.md).
@@ -88,6 +94,19 @@ ComponentDelta = 0x02f9
 SimulationFrameValue = 0x02f5
 SetPause = 0x01fe
 AddObject = 0x02f7
+# Waypoint mask (session +0x2318, handler 0x142123878): u8, u32 entity, 22 bytes; bits are WorldAreas
+# rows (docs/re/world-travel.md).
+WaypointMask = 0x005a
+# Opens a panel (handler 0x1421111c0): u8 local, u8 sub, u32 a, b, c, d. Sub 0 World panel, 0x2a area map.
+OpenPanel = 0x0098
+# Starts the load of an area (0x14211fc50): u8, u16 HASH16, u8.
+AreaLoad = 0x02f1
+# The instances of an area to choose from: u8, u16 hash, u8, u8 n, entries.
+InstanceList = 0x00ce
+# The waypoint or checkpoint in reach: u8 local, u32 entity (session +0x2274).
+TouchedObject = 0x006b
+# Checkpoint travel list of the area map (case 0x142125446): u8, u8 n, n x (u8 bit 7 boss, bits 0-6 index; u16 x, u16 y).
+WarpList = 0x0352
 # Entity WASD movement (direction + grid position), handled by the Actor component.
 MoveDirectionUpdate = 0x0064
 # An entity starts an action (skill id, target), handled by the Actor component.

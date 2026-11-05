@@ -1814,3 +1814,299 @@ impl Message for ComponentDelta {
         })
     }
 }
+
+/// S `0x5a`: the waypoints the character has (`mask` bits are `WorldAreas` rows,
+/// docs/re/world-travel.md). `entity` is 0 at area entry, the waypoint right before [`OpenPanel`].
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct WaypointMask {
+    pub unk: u8,
+    pub entity: u32,
+    pub mask: [u8; 22],
+}
+
+impl Message for WaypointMask {
+    const NAME: &'static str = "WaypointMask";
+    const DIRECTION: Direction = Direction::Server;
+    fn encode(&self, w: &mut Writer) {
+        w.u8(self.unk).u32(self.entity).bytes(&self.mask);
+    }
+    fn decode(r: &mut Reader<'_>) -> Result<Self, DecodeError> {
+        let (unk, entity) = (r.u8()?, r.u32()?);
+        let mut mask = [0; 22];
+        mask.copy_from_slice(r.bytes(22)?);
+        Ok(Self { unk, entity, mask })
+    }
+}
+
+/// S `0x98`: opens a panel. Sub 0: the World panel (`a` the waypoint, `b` the mode); sub
+/// [`OpenPanel::AREA_MAP`]: the large area map.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct OpenPanel {
+    pub local: u8,
+    pub sub: u8,
+    pub a: u32,
+    pub b: u32,
+    pub c: u32,
+    pub d: u32,
+}
+
+impl OpenPanel {
+    pub const WORLD: u8 = 0;
+    pub const AREA_MAP: u8 = 0x2a;
+}
+
+impl Message for OpenPanel {
+    const NAME: &'static str = "OpenPanel";
+    const DIRECTION: Direction = Direction::Server;
+    fn encode(&self, w: &mut Writer) {
+        w.u8(self.local)
+            .u8(self.sub)
+            .u32(self.a)
+            .u32(self.b)
+            .u32(self.c)
+            .u32(self.d);
+    }
+    fn decode(r: &mut Reader<'_>) -> Result<Self, DecodeError> {
+        Ok(Self {
+            local: r.u8()?,
+            sub: r.u8()?,
+            a: r.u32()?,
+            b: r.u32()?,
+            c: r.u32()?,
+            d: r.u32()?,
+        })
+    }
+}
+
+/// C `0x5b`: the waypoint chosen in the World panel.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct WaypointChoice {
+    pub local: u8,
+    pub area_hash: u16,
+    pub entity: u32,
+    /// Bit 7: ctrl held (asks for the instance list).
+    pub flags: u8,
+}
+
+impl Message for WaypointChoice {
+    const NAME: &'static str = "WaypointChoice";
+    const DIRECTION: Direction = Direction::Client;
+    fn encode(&self, w: &mut Writer) {
+        w.u8(self.local)
+            .u16(self.area_hash)
+            .u32(self.entity)
+            .u8(self.flags);
+    }
+    fn decode(r: &mut Reader<'_>) -> Result<Self, DecodeError> {
+        Ok(Self {
+            local: r.u8()?,
+            area_hash: r.u16()?,
+            entity: r.u32()?,
+            flags: r.u8()?,
+        })
+    }
+}
+
+/// S `0x2f1`: the client starts loading an area. `tail` is 2 after a waypoint, 0 after a walked
+/// gate in the capture.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct AreaLoad {
+    pub unk: u8,
+    pub area_hash: u16,
+    pub tail: u8,
+}
+
+impl Message for AreaLoad {
+    const NAME: &'static str = "AreaLoad";
+    const DIRECTION: Direction = Direction::Server;
+    fn encode(&self, w: &mut Writer) {
+        w.u8(self.unk).u16(self.area_hash).u8(self.tail);
+    }
+    fn decode(r: &mut Reader<'_>) -> Result<Self, DecodeError> {
+        Ok(Self {
+            unk: r.u8()?,
+            area_hash: r.u16()?,
+            tail: r.u8()?,
+        })
+    }
+}
+
+/// One row of [`InstanceList`].
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct InstanceRow {
+    pub id: u64,
+    /// The capture shows values like 1186 and 1000; the meaning is open.
+    pub unk: u32,
+    /// The capture has 0x1d here, the area's level there.
+    pub level: u8,
+    pub names: Vec<String>,
+}
+
+/// S `0xce`: the instances of an area to choose from (the client answers [`InstanceChoice`]).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct InstanceList {
+    pub local: u8,
+    pub area_hash: u16,
+    pub level: u8,
+    pub rows: Vec<InstanceRow>,
+}
+
+impl Message for InstanceList {
+    const NAME: &'static str = "InstanceList";
+    const DIRECTION: Direction = Direction::Server;
+    fn encode(&self, w: &mut Writer) {
+        w.u8(self.local)
+            .u16(self.area_hash)
+            .u8(self.level)
+            .u8(self.rows.len() as u8);
+        for row in &self.rows {
+            w.u32_le(row.id as u32)
+                .u32_le((row.id >> 32) as u32)
+                .u32(row.unk)
+                .u8(row.level)
+                .u8(row.names.len() as u8);
+            for name in &row.names {
+                w.u16(name.len() as u16).bytes(name.as_bytes());
+            }
+        }
+    }
+    fn decode(r: &mut Reader<'_>) -> Result<Self, DecodeError> {
+        let (local, area_hash, level) = (r.u8()?, r.u16()?, r.u8()?);
+        let n = r.u8()?;
+        let mut rows = Vec::with_capacity(n as usize);
+        for _ in 0..n {
+            let (low, high) = (r.u32()?.swap_bytes(), r.u32()?.swap_bytes());
+            let (unk, row_level) = (r.u32()?, r.u8()?);
+            let m = r.u8()?;
+            let mut names = Vec::with_capacity(m as usize);
+            for _ in 0..m {
+                let len = r.u16()? as usize;
+                names.push(String::from_utf8_lossy(r.bytes(len)?).into_owned());
+            }
+            rows.push(InstanceRow {
+                id: u64::from(high) << 32 | u64::from(low),
+                unk,
+                level: row_level,
+                names,
+            });
+        }
+        Ok(Self {
+            local,
+            area_hash,
+            level,
+            rows,
+        })
+    }
+}
+
+/// C `0xcf`: the row chosen in [`InstanceList`]; [`InstanceChoice::NEW`] asks for a new instance.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct InstanceChoice {
+    pub local: u8,
+    pub choice: u8,
+}
+
+impl InstanceChoice {
+    pub const NEW: u8 = 0xff;
+}
+
+impl Message for InstanceChoice {
+    const NAME: &'static str = "InstanceChoice";
+    const DIRECTION: Direction = Direction::Client;
+    fn encode(&self, w: &mut Writer) {
+        w.u8(self.local).u8(self.choice);
+    }
+    fn decode(r: &mut Reader<'_>) -> Result<Self, DecodeError> {
+        Ok(Self {
+            local: r.u8()?,
+            choice: r.u8()?,
+        })
+    }
+}
+
+/// S `0x6b`: the waypoint or checkpoint in reach (`entity` 0: none).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct TouchedObject {
+    pub local: u8,
+    pub entity: u32,
+}
+
+impl Message for TouchedObject {
+    const NAME: &'static str = "TouchedObject";
+    const DIRECTION: Direction = Direction::Server;
+    fn encode(&self, w: &mut Writer) {
+        w.u8(self.local).u32(self.entity);
+    }
+    fn decode(r: &mut Reader<'_>) -> Result<Self, DecodeError> {
+        Ok(Self {
+            local: r.u8()?,
+            entity: r.u32()?,
+        })
+    }
+}
+
+/// One travel button of the area map.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct WarpEntry {
+    pub boss: bool,
+    /// 0 is the waypoint button.
+    pub index: u8,
+    pub x: u16,
+    pub y: u16,
+}
+
+/// S `0x352`: the area map's travel buttons; a click answers [`WarpRequest`] with the index.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct WarpList {
+    pub unk: u8,
+    pub entries: Vec<WarpEntry>,
+}
+
+impl Message for WarpList {
+    const NAME: &'static str = "WarpList";
+    const DIRECTION: Direction = Direction::Server;
+    fn encode(&self, w: &mut Writer) {
+        w.u8(self.unk).u8(self.entries.len() as u8);
+        for e in &self.entries {
+            w.u8(e.index & 0x7f | if e.boss { 0x80 } else { 0 })
+                .u16(e.x)
+                .u16(e.y);
+        }
+    }
+    fn decode(r: &mut Reader<'_>) -> Result<Self, DecodeError> {
+        let unk = r.u8()?;
+        let n = r.u8()?;
+        let mut entries = Vec::with_capacity(n as usize);
+        for _ in 0..n {
+            let flag = r.u8()?;
+            entries.push(WarpEntry {
+                boss: flag & 0x80 != 0,
+                index: flag & 0x7f,
+                x: r.u16()?,
+                y: r.u16()?,
+            });
+        }
+        Ok(Self { unk, entries })
+    }
+}
+
+/// C `0x353`: a travel button of the area map.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct WarpRequest {
+    pub local: u8,
+    pub index: u8,
+}
+
+impl Message for WarpRequest {
+    const NAME: &'static str = "WarpRequest";
+    const DIRECTION: Direction = Direction::Client;
+    fn encode(&self, w: &mut Writer) {
+        w.u8(self.local).u8(self.index);
+    }
+    fn decode(r: &mut Reader<'_>) -> Result<Self, DecodeError> {
+        Ok(Self {
+            local: r.u8()?,
+            index: r.u8()?,
+        })
+    }
+}
