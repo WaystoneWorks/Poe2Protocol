@@ -245,7 +245,9 @@ mod tests {
         // 2026-10-20 f3286/f3287 (bodies after the opcode): 0x200 value 1, 0x2a6 0.2.
         let r: StanceRequest = decode_all(&[0x01, 0x01]);
         assert_eq!((r.player, r.value), (1, 1));
-        let bytes = [0, 0, 0, 0x65, 0, 0, 0, 0, 0, 0, 0, 0x3e, 0x4c, 0xcc, 0xcd, 0];
+        let bytes = [
+            0, 0, 0, 0x65, 0, 0, 0, 0, 0, 0, 0, 0x3e, 0x4c, 0xcc, 0xcd, 0,
+        ];
         let l: OrientationLerp = decode_all(&bytes);
         assert_eq!((l.header.entity_id, l.value, l.flag), (0x65, 0.2, 0));
         let mut w = Writer::new();
