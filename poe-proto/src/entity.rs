@@ -443,11 +443,12 @@ mod tests {
     }
 }
 
-/// What follows the art path in a travel object's blob (captured, not decoded:
+/// What follows the art path in a travel object's blob (captured; the gate's is decoded:
 /// docs/re/world-travel.md in the hub).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ObjectTail {
-    /// A gate: the area it leads to and its place among the gates to that area.
+    /// A gate: the area it leads to and, in a town only, its place among the gates to that area
+    /// (outside a town the client reads no index).
     Gate {
         area_hash: u16,
         index: u8,
@@ -482,6 +483,9 @@ pub fn travel_object_blob((x, y): (i32, i32), angle: f32, ao: &str, tail: Object
     b.extend(wide.iter().flat_map(|c| c.to_le_bytes()));
     b.push(0);
     match tail {
+        // AreaTransition (`0x141daaa00`): the `u8` above, destination tag 2 with `u16 HASH16`
+        // (`0x141d9bca0`), then a varuint index only in a town (the area's `IsTown`, when that
+        // `u8` is 0). Then Stats with count 0 and the rest, the same in every capture.
         ObjectTail::Gate {
             area_hash,
             index,
@@ -489,11 +493,14 @@ pub fn travel_object_blob((x, y): (i32, i32), angle: f32, ao: &str, tail: Object
         } => {
             b.push(2);
             b.extend(area_hash.to_le_bytes());
-            b.push(index);
-            // Six zero bytes in `G1_town`, five in `G1_2` and `G1_3` (the reason is unknown; with five
-            // in a town the client never finishes loading the area).
-            b.extend(vec![0; if town { 6 } else { 5 }]);
-            b.extend([1, 8, 0, 0, 0, 0, 1, 0, 0, 0]);
+            if town {
+                // Two bytes from 0x80 (inferred: no capture has an index that large).
+                if index >= 0x80 {
+                    b.push(0x80);
+                }
+                b.push(index);
+            }
+            b.extend([0, 0, 0, 0, 0, 0, 1, 8, 0, 0, 0, 0, 1, 0, 0, 0]);
         }
         ObjectTail::Waypoint => b.extend([1, 0]),
         // StateMachine with its two shared states, `InteractionAction` flags.
@@ -532,6 +539,42 @@ mod travel_object_tests {
         );
         let tail = [
             0, 2, 0x70, 0x3f, 0, 0, 0, 0, 0, 0, 1, 8, 0, 0, 0, 0, 1, 0, 0, 0,
+        ];
+        assert_eq!(&b[b.len() - tail.len()..], tail);
+    }
+
+    #[test]
+    fn a_gate_outside_a_town_sends_no_index() {
+        // G1_8's second gate to G1_7: an index byte there made the client throw BufferUnderflow.
+        let gate = |index| {
+            travel_object_blob(
+                (817, 732),
+                5.8,
+                "x.ao",
+                ObjectTail::Gate {
+                    area_hash: 0xe911,
+                    index,
+                    town: false,
+                },
+            )
+        };
+        assert_eq!(gate(0), gate(1));
+    }
+
+    #[test]
+    fn a_town_gate_blob_ends_as_the_capture_of_g1_town() {
+        let b = travel_object_blob(
+            (383, 398),
+            0.0,
+            "x.ao",
+            ObjectTail::Gate {
+                area_hash: 0x9875,
+                index: 2,
+                town: true,
+            },
+        );
+        let tail = [
+            0, 2, 0x75, 0x98, 2, 0, 0, 0, 0, 0, 0, 1, 8, 0, 0, 0, 0, 1, 0, 0, 0,
         ];
         assert_eq!(&b[b.len() - tail.len()..], tail);
     }
