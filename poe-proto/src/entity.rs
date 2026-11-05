@@ -451,10 +451,12 @@ pub enum ObjectTail {
     Gate {
         area_hash: u16,
         index: u8,
+        /// The gate stands in a town.
+        town: bool,
     },
     Waypoint,
     Checkpoint,
-    /// Never captured: a checkpoint's tail, for the same components without its `ControlZone`.
+    /// Never captured: laid out from the `.ot` and the readers.
     Well,
 }
 
@@ -470,22 +472,34 @@ pub fn travel_object_blob((x, y): (i32, i32), angle: f32, ao: &str, tail: Object
         ObjectTail::Checkpoint => b.extend([0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0xc0, 0x40]),
         _ => b.extend([0, 0, 0, 0, 0]),
     }
+    // A well lists `InteractionAction` before `Animated` in its `.ot`: components come in that order.
+    if matches!(tail, ObjectTail::Well) {
+        b.push(0);
+    }
     b.push(0x41);
     let wide: Vec<u16> = ao.encode_utf16().collect();
     b.extend((wide.len() as u32).to_le_bytes());
     b.extend(wide.iter().flat_map(|c| c.to_le_bytes()));
     b.push(0);
     match tail {
-        ObjectTail::Gate { area_hash, index } => {
+        ObjectTail::Gate {
+            area_hash,
+            index,
+            town,
+        } => {
             b.push(2);
             b.extend(area_hash.to_le_bytes());
             b.push(index);
-            // Six zero bytes in `G1_town`, five in `G1_2` and `G1_3` (unexplained).
-            b.extend([0; 5]);
+            // Six zero bytes in `G1_town`, five in `G1_2` and `G1_3` (the reason is unknown; with five
+            // in a town the client never finishes loading the area).
+            b.extend(vec![0; if town { 6 } else { 5 }]);
             b.extend([1, 8, 0, 0, 0, 0, 1, 0, 0, 0]);
         }
         ObjectTail::Waypoint => b.extend([1, 0]),
-        ObjectTail::Checkpoint | ObjectTail::Well => b.extend([2, 0, 0, 0, 0, 0, 0]),
+        // StateMachine with its two shared states, `InteractionAction` flags.
+        ObjectTail::Checkpoint => b.extend([2, 0, 0, 0, 0, 0, 0]),
+        // StateMachine: no shared state (the well's `active` is client side).
+        ObjectTail::Well => b.extend([0, 0]),
     }
     b
 }
@@ -513,6 +527,7 @@ mod travel_object_tests {
             ObjectTail::Gate {
                 area_hash: 0x3f70,
                 index: 0,
+                town: false,
             },
         );
         let tail = [
