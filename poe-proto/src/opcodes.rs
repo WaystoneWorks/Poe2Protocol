@@ -25,11 +25,11 @@ pub struct EmbeddedOpcodes {
 /// Every supported version's tables, oldest first. A new `opcodes/<version>/` folder is added
 /// here (a test fails when one is missing) and to the main repository's `versions/`.
 pub const EMBEDDED: &[EmbeddedOpcodes] = &[EmbeddedOpcodes {
-    version: "0.5.5e.hotfix1",
-    login_toml: include_str!("../../opcodes/0.5.5e.hotfix1/login.toml"),
-    instance_toml: include_str!("../../opcodes/0.5.5e.hotfix1/instance.toml"),
-    hnc_toml: include_str!("../../opcodes/0.5.5e.hotfix1/hnc.toml"),
-    inventories_tsv: include_str!("../../opcodes/0.5.5e.hotfix1/inventories.tsv"),
+    version: "0.5.5f",
+    login_toml: include_str!("../../opcodes/0.5.5f/login.toml"),
+    instance_toml: include_str!("../../opcodes/0.5.5f/instance.toml"),
+    hnc_toml: include_str!("../../opcodes/0.5.5f/hnc.toml"),
+    inventories_tsv: include_str!("../../opcodes/0.5.5f/inventories.tsv"),
 }];
 
 /// The compiled-in tables of `version`.

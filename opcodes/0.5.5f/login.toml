@@ -1,0 +1,41 @@
+# Login protocol opcodes for client 0.5.5f (u16, big-endian on the wire).
+# [client] = messages the client sends, [server] = messages the server sends.
+# Layouts: docs/protocol/login.md, Rust types: poe-proto/src/login.rs
+# The client's incoming-packet factory is at 0x14215f000 (opcode -> class).
+
+[client]
+KeepAlive = 0x0001
+KeyExchange = 0x0002
+# Standalone (email/password) platform login: docs/re/standalone-login.md.
+Credentials = 0x0003
+Authenticate = 0x0005
+# After "Exit to character selection": u32 account id, u64 token from instance 0x174.
+ResumeSession = 0x0008
+DeleteCharacter = 0x000c
+PlayCharacter = 0x000e
+RequestCharacterDetails = 0x0010
+CreateCharacter = 0x0012
+RequestCharacterList = 0x0018
+# League Migrations window (docs/protocol/login.md#league-migrations).
+RequestLeaguesWithProgress = 0x0019
+MigrateCharacter = 0x003f
+MigrateLeague = 0x0040
+# Sent instead of 0x18 after a previous session reached the instance hand-off (u32 account
+# id). Provisional: handled like RequestCharacterList.
+RequestCharacterListAlt = 0x0046
+
+[server]
+KeepAliveReply = 0x0001
+KeyExchange = 0x0002
+DeleteCharacterResult = 0x000d
+AuthenticationResult = 0x0004
+CharacterDetails = 0x0011
+CharacterList = 0x0015
+CharacterCreated = 0x0013
+InstanceDetails = 0x0014
+LeaguesWithProgress = 0x001a
+LeagueList = 0x001b
+MigrationResult = 0x0044
+# Four zero u32 before the key exchange; u16 0x0014 after InstanceDetails (official servers).
+Unknown003c = 0x003c
+Unknown0017 = 0x0017

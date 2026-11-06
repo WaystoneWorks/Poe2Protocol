@@ -1,4 +1,4 @@
-//! Login channel messages (client 0.5.5e Hotfix 1). Layouts were taken from the client's packet
+//! Login channel messages (client 0.5.5f). Layouts were taken from the client's packet
 //! (de)serializers; see `docs/protocol/login.md`.
 
 use poe_net::{DecodeError, Reader, Writer};
@@ -76,7 +76,7 @@ impl Message for KeepAlive {
 }
 
 /// S→C keep-alive reply (no body; the client's login factory maps 0x01 to the empty class
-/// `0x143506450`).
+/// `0x14351b938`).
 #[derive(Debug, Clone, Copy)]
 pub struct KeepAliveReply;
 
@@ -89,14 +89,14 @@ impl Message for KeepAliveReply {
     }
 }
 
-/// Client authentication (serializer `0x1420e3670`).
+/// Client authentication (serializer `0x1420f2540`).
 #[derive(Debug, Clone)]
 pub struct Authenticate {
     /// Low flag byte (`0x40` set by the client, plus a client-global value).
     pub flags_lo: u8,
-    /// 32 bytes from `0x1420e7700` (client-side hash; exact meaning TBD).
+    /// 32 bytes from `0x1420f65d0` (client-side hash; exact meaning TBD).
     pub client_hash: [u8; 32],
-    /// 32 bytes from `0x1421c1580` (stable per machine; our server does not use it: it refuses the Steam
+    /// 32 bytes from `0x1421d1400` (stable per machine; our server does not use it: it refuses the Steam
     /// `0x0005` login (result 9), accounts log in with [`Credentials`]).
     pub machine_hash: [u8; 32],
     pub flags_hi: u8,
@@ -127,7 +127,7 @@ impl Message for Authenticate {
     }
 }
 
-/// Standalone-platform login (client serializer `0x1420e3ce0`, builder `0x1420e7c70`,
+/// Standalone-platform login (client serializer `0x1420f2bb0`, builder `0x1420f6b40`,
 /// `docs/re/standalone-login.md`). Sent instead of [`Authenticate`] when the client platform
 /// is 0 (email/password screen).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -138,7 +138,7 @@ pub struct Credentials {
     pub account_name: String,
     /// Same value as in [`Authenticate`].
     pub client_hash: [u8; 32],
-    /// SHA-256 of the UTF-16LE password (`0x1421bbec0`), or (with `token_login`) the 32-byte token a previous
+    /// SHA-256 of the UTF-16LE password (`0x1421cbd40`), or (with `token_login`) the 32-byte token a previous
     /// [`AuthenticationResult::session_token`] handed out.
     pub password_hash: [u8; 32],
     pub machine_hash: [u8; 32],
@@ -181,7 +181,7 @@ impl Message for Credentials {
     }
 }
 
-/// Authentication result (deserializer `0x14214dbe0`, handler at `0x1420e841d`).
+/// Authentication result (deserializer `0x14215cf80`, handler at `0x1420f72ed`).
 #[derive(Debug, Clone)]
 pub struct AuthenticationResult {
     pub account_id: u32,
@@ -288,7 +288,7 @@ mod tests {
     }
 }
 
-/// Sent after authentication with the selected account's id (client code `0x140f047d3`).
+/// Sent after authentication with the selected account's id (client code `0x140f0d1b3`).
 #[derive(Debug, Clone, Copy)]
 pub struct RequestCharacterList {
     pub account_id: u32,
@@ -356,9 +356,9 @@ impl Message for ResumeSession {
     }
 }
 
-/// S→C reply to [`DeleteCharacter`] (class `0x143509f18`, shared with 0x0b/0x0f/0x44: `u16`
+/// S→C reply to [`DeleteCharacter`] (class `0x14351f540`, shared with 0x0b/0x0f/0x44: `u16`
 /// at +0x14, then `u32` at +0x10). Signals event +0xb88, which the delete screen
-/// (`0x140ed8710`) handles: `result` 0 closes it as deleted, anything else is shown as an
+/// (`0x140ee11b0`) handles: `result` 0 closes it as deleted, anything else is shown as an
 /// error (text looked up by code).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct DeleteCharacterResult {
@@ -382,7 +382,7 @@ impl Message for DeleteCharacterResult {
     }
 }
 
-/// One character in [`CharacterList`] (entry reader `0x142716700`, 0x58-byte client struct).
+/// One character in [`CharacterList`] (entry reader `0x142728880`, 0x58-byte client struct).
 /// Field names after `name` are provisional until their meaning is confirmed in the UI code;
 /// the comments give the client struct offsets.
 #[derive(Debug, Clone, Default)]
@@ -451,11 +451,11 @@ impl CharacterEntry {
     }
 }
 
-/// Character list (deserializer `0x14214e210`, client struct offsets in comments).
+/// Character list (deserializer `0x14215d5b0`, client struct offsets in comments).
 #[derive(Debug, Clone, Default)]
 pub struct CharacterList {
     /// Account the list belongs to; the client drops the list unless it matches a
-    /// logged-in account (handler `0x1420e86b4`). Client +0x70.
+    /// logged-in account (handler `0x1420f7584`). Client +0x70.
     pub account_id: u32,
     pub characters: Vec<CharacterEntry>,
     /// +0x28
@@ -527,7 +527,7 @@ impl Message for CharacterList {
     }
 }
 
-/// One league in [`LeagueList`] (entry reader `0x142716e10`, 0xe8-byte client struct).
+/// One league in [`LeagueList`] (entry reader `0x142728f90`, 0xe8-byte client struct).
 /// Text fields must not be empty; meanings of the later fields are provisional.
 #[derive(Debug, Clone, Default)]
 pub struct LeagueEntry {
@@ -536,7 +536,7 @@ pub struct LeagueEntry {
     /// Display name (client +0x40); official sends a `#League...` text key.
     pub name: String,
     /// client +0x60: an SSF variant names its non-SSF sibling here (SSF -> base, HC SSF -> HC);
-    /// the creation banner pairs the SSF checkbox through it (`0x140e7ca80`). Empty otherwise.
+    /// the creation banner pairs the SSF checkbox through it (`0x140e855a0`). Empty otherwise.
     pub text_60: String,
     /// client +0x80: a Hardcore variant names its softcore sibling here (HC -> base,
     /// HC SSF -> SSF); the Hardcore checkbox. Empty otherwise.
@@ -556,7 +556,7 @@ pub struct LeagueEntry {
     /// client +0xc1: league category (`LeagueCategoryToDisplayName.Id`); 1 (Standard) is the
     /// banner preselected at character creation.
     pub flag_c1: u8,
-    /// client +0xc2: `LeagueFlag` row + 1 of the creation banner (`0x140e77810`).
+    /// client +0xc2: `LeagueFlag` row + 1 of the creation banner (`0x140e80330`).
     pub flag_c2: u8,
 }
 
@@ -595,7 +595,7 @@ impl LeagueEntry {
     }
 }
 
-/// League list (deserializer `0x14214f1f0`, handler `0x1420e930e`).
+/// League list (deserializer `0x14215e610`, handler `0x1420f824e`).
 #[derive(Debug, Clone, Default)]
 pub struct LeagueList {
     /// Server time in seconds since the Unix epoch; the client stores the offset to its clock.
@@ -632,8 +632,8 @@ impl Message for LeagueList {
     }
 }
 
-/// C→S: the League Migrations window asks what can be migrated (sender `0x140f0a2d0`, class
-/// `0x143506270`). Reply: [`LeaguesWithProgress`].
+/// C→S: the League Migrations window asks what can be migrated (sender `0x140f12cb0`, class
+/// `0x14351b7e8`). Reply: [`LeaguesWithProgress`].
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct RequestLeaguesWithProgress {
     pub account_id: u32,
@@ -652,8 +652,8 @@ impl Message for RequestLeaguesWithProgress {
     }
 }
 
-/// S→C: the League Migrations window's list (deserializer `0x14214ea40`, class `0x143509f38`,
-/// handler `0x140f0b660`). `leagues` holds pairs: `[from, to, from, to, ...]`.
+/// S→C: the League Migrations window's list (deserializer `0x14215dde0`, class `0x14351f580`,
+/// handler `0x140f14040`). `leagues` holds pairs: `[from, to, from, to, ...]`.
 #[derive(Debug, Clone, Default)]
 pub struct LeaguesWithProgress {
     /// 0, else a `BackendErrors` code: the client closes the window and shows the error.
@@ -680,7 +680,7 @@ impl Message for LeaguesWithProgress {
     }
 }
 
-/// C→S: Migrate on one character of the window (sender `0x1420eac10`, class `0x1435061f0`).
+/// C→S: Migrate on one character of the window (sender `0x1420f9b50`, class `0x14351b8d8`).
 /// The message names no target league: the server decides.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct MigrateCharacter {
@@ -702,7 +702,7 @@ impl Message for MigrateCharacter {
     }
 }
 
-/// C→S: Migrate All on one league of the window (sender `0x1420ead40`, same class as
+/// C→S: Migrate All on one league of the window (sender `0x1420f9c80`, same class as
 /// [`MigrateCharacter`]). `league` is the id of the pair's first entry.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct MigrateLeague {
@@ -724,8 +724,8 @@ impl Message for MigrateLeague {
     }
 }
 
-/// S→C reply to [`MigrateCharacter`] and [`MigrateLeague`] (class `0x143509f18`, handler
-/// `0x140f0b3e0`). Non-zero: the client shows "Migration Failed" with the code's text. Zero
+/// S→C reply to [`MigrateCharacter`] and [`MigrateLeague`] (class `0x14351f540`, handler
+/// `0x140f13dc0`). Non-zero: the client shows "Migration Failed" with the code's text. Zero
 /// does nothing in the client: the server sends the new lists itself.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct MigrationResult {
@@ -748,7 +748,7 @@ impl Message for MigrationResult {
     }
 }
 
-/// Create a character (client serializer `0x1420e4cc0`, built in `0x1420e9ce0`).
+/// Create a character (client serializer `0x1420f3b90`, built in `0x1420f8c20`).
 #[derive(Debug, Clone)]
 pub struct CreateCharacter {
     pub name: String,
@@ -790,10 +790,10 @@ impl Message for CreateCharacter {
     }
 }
 
-/// Character creation result, opcode `0x13` (class `0x143509e98`, deserializer
-/// `0x14214ebf0`; login dispatch case `0x1420e8ade` signals the create screen's callback
-/// `0x140ed2ab0`). On result 0 the screen plays the creation scene, then looks the new
-/// character up by name in the character list and sends PlayCharacter (`0x140ecee50`).
+/// Character creation result, opcode `0x13` (class `0x14351f4a0`, deserializer
+/// `0x14215df90`; login dispatch case `0x1420f79ae` signals the create screen's callback
+/// `0x140edb550`). On result 0 the screen plays the creation scene, then looks the new
+/// character up by name in the character list and sends PlayCharacter (`0x140ed78f0`).
 /// Any other result is shown as an error text.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct CharacterCreated {
@@ -927,7 +927,7 @@ impl Message for RequestCharacterDetails {
     }
 }
 
-/// Details of one character (deserializer `0x14214e7d0`). Same trailing layout as
+/// Details of one character (deserializer `0x14215db70`). Same trailing layout as
 /// [`CharacterList`]; the blob and pairs probably carry equipment/appearance (TBD).
 #[derive(Debug, Clone, Default)]
 pub struct CharacterDetails {
@@ -989,7 +989,7 @@ impl Message for CharacterDetails {
     }
 }
 
-/// "Play" on the character select screen (client serializer `0x1420e47e0`). One entry per
+/// "Play" on the character select screen (client serializer `0x1420f36b0`). One entry per
 /// local player (split-screen on consoles): `(character index, account id)`.
 #[derive(Debug, Clone, Default)]
 pub struct PlayCharacter {
@@ -1017,8 +1017,8 @@ impl Message for PlayCharacter {
     }
 }
 
-/// Hand-off to an instance server (deserializer `0x14214ee60`, handler `0x1420e9078`,
-/// connect `0x14211dd30`).
+/// Hand-off to an instance server (deserializer `0x14215e240`, handler `0x1420f7f58`,
+/// connect `0x14212cde0`).
 #[derive(Debug, Clone)]
 pub struct InstanceDetails {
     /// Host the client connects to (client +0x10).
@@ -1030,14 +1030,16 @@ pub struct InstanceDetails {
     /// Target area, `WorldAreas.HASH16` (client +0x3a; looked up, the hand-off fails if
     /// unknown).
     pub area_hash: u16,
+    /// Client +0x40 (new in 0.5.5f; empty works, docs/protocol/login.md).
+    pub unk_40: String,
     /// Client +0x34.
     pub unk_34: u32,
-    /// 64 bytes of stream key material for the instance connection (client +0x3c).
+    /// 64 bytes of stream key material for the instance connection (client +0x60).
     pub keys: [u8; 64],
-    /// Client +0x7c.
-    pub unk_7c: [u8; 8],
-    /// Client +0x84.
-    pub unk_84: u8,
+    /// Client +0xa0.
+    pub unk_a0: [u8; 8],
+    /// Client +0xa8.
+    pub unk_a8: u8,
 }
 
 impl Message for InstanceDetails {
@@ -1048,10 +1050,11 @@ impl Message for InstanceDetails {
             .u16(self.port)
             .u32(self.unk_30)
             .u16(self.area_hash)
+            .astring(&self.unk_40)
             .u32(self.unk_34)
             .bytes(&self.keys)
-            .bytes(&self.unk_7c)
-            .u8(self.unk_84);
+            .bytes(&self.unk_a0)
+            .u8(self.unk_a8);
     }
     fn decode(r: &mut Reader<'_>) -> Result<Self, DecodeError> {
         Ok(Self {
@@ -1059,10 +1062,11 @@ impl Message for InstanceDetails {
             port: r.u16()?,
             unk_30: r.u32()?,
             area_hash: r.u16()?,
+            unk_40: r.astring()?,
             unk_34: r.u32()?,
             keys: r.array()?,
-            unk_7c: r.array()?,
-            unk_84: r.u8()?,
+            unk_a0: r.array()?,
+            unk_a8: r.u8()?,
         })
     }
 }
@@ -1082,7 +1086,7 @@ mod play_tests {
     }
 }
 
-/// S→C `0x003c` (deserializer `0x14214f400`): four u32, all zero on official servers, sent
+/// S→C `0x003c` (deserializer `0x14215e820`): four u32, all zero on official servers, sent
 /// in plaintext right before the server's key exchange. Meaning unknown.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Unknown003c {
@@ -1104,7 +1108,7 @@ impl Message for Unknown003c {
     }
 }
 
-/// S→C `0x0017` (deserializer `0x14214f0c0`): a u16; official servers send `0x0014` right
+/// S→C `0x0017` (deserializer `0x14215e4e0`): a u16; official servers send `0x0014` right
 /// after InstanceDetails (`0x14`), so it is probably "request answered" for that opcode.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Unknown0017 {
