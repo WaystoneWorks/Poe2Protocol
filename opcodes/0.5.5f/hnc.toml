@@ -1,7 +1,7 @@
 # HNC side channel of the instance connection (client 0.5.5f).
 #
 # The EnableEncryption handler (0x1421312e0) builds, from the same 64-byte key material as the
-# packet ciphers (InstanceDetails +0x38), a second Salsa20 pair for an anti-cheat side channel
+# packet ciphers (InstanceDetails +0x60), a second Salsa20 pair for an anti-cheat side channel
 # whose bits ride inside 0x1c (client frame report) and 0x1d (server reply). The material is
 # XORed with this table (0x142f23aa0), then these byte pairs are swapped (0x1421d5170), then
 # split into key/IVs exactly like the packet ciphers. See docs/re/crypto.md.
