@@ -19,7 +19,7 @@
 version = "0.5.5g"
 # supported = tested end to end; experimental = signatures resolve, layouts unchecked;
 # legacy = kept for old captures only.
-status = "experimental"
+status = "supported"
 app_id = 2694490
 # `Build Revision:` of Client.txt, a plain ASCII string in the exe's .rdata.
 build_revision = "328873"
@@ -101,7 +101,7 @@ required_features = [
 # ([security] allow_unknown_client = false) with BackendErrors `InvalidProtocolVersion`.
 [client]
 hashes = ["37f3268edb05ac56aab0c7ddbbc76fbff2010860e3c8f3b9f875e9a4e86b570f"]
-hashes_confirmed = false
+hashes_confirmed = true
 # Strings `check-build` must find in the exe (ASCII or UTF-16LE): command-line options, file
 # names and log lines that tools and the DLL depend on.
 strings = [
