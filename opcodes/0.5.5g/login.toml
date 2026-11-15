@@ -1,7 +1,7 @@
-# Login protocol opcodes for client 0.5.5f (u16, big-endian on the wire).
+# Login protocol opcodes for client 0.5.5g (u16, big-endian on the wire).
 # [client] = messages the client sends, [server] = messages the server sends.
 # Layouts: docs/protocol/login.md, Rust types: poe-proto/src/login.rs
-# The client's incoming-packet factory is at 0x14215f000 (opcode -> class).
+# The client's incoming-packet factory is at 0x14215f380 (opcode -> class).
 
 [client]
 KeepAlive = 0x0001
