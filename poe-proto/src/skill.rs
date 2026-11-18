@@ -13,8 +13,8 @@
 //! | `0x01ac` [`SkillInputEnd`] | `0x01b1` [`SkillInputEndAck`] |
 //! | `0x01ad` SkillReleased | `0x01b2` [`SkillReleasedAck`] |
 //!
-//! The acknowledgements are Player-component simulation messages (handler `0x14172e1d0`,
-//! vtable `0x1433a8cf0` +0xc0): the client skips them only when its world is in mode 1
+//! The acknowledgements are Player-component simulation messages (handler `0x14172e420`,
+//! vtable `0x1433a8f40` +0xc0): the client skips them only when its world is in mode 1
 //! (predictive; world vfunc +0x1d8), which never happens in lockstep.
 
 use poe_net::{DecodeError, Reader, Writer};
@@ -22,7 +22,7 @@ use poe_net::{DecodeError, Reader, Writer};
 use crate::{Direction, Message, instance::SimulationHeader};
 
 /// The parameter block shared by C→S `0x01a5` (after the `u8` player) and S→C `0x01ae`
-/// (after the header): reader `0x141edc330`, writer `0x141edc230`.
+/// (after the header): reader `0x141edc580`, writer `0x141edc480`.
 ///
 /// `u32 skill, u16 flags, u8 unk_13, u8 target_flags, [u32 target entity if target_flags & 8],
 /// i32 x, i32 y`.
@@ -32,7 +32,7 @@ use crate::{Direction, Message, instance::SimulationHeader};
 /// player cell plus the relative offset, e.g. roll start `(371, 1052)` + `(15, -35)` =
 /// `(386, 1017)`), `flags`/`unk_13` echo the request and `target_flags` echo it with bit `0x04`
 /// set. `target_flags` bits seen: `0x01` / `0x02` / `0x10` (set on held repeats), `0x08` (target
-/// entity), `0x04` (server-confirmed, absolute). Client handler `0x141de1920`
+/// entity), `0x04` (server-confirmed, absolute). Client handler `0x141de1b70`
 /// (`Player_ApplyServerSkillUse`): with `0x04` set it only stores the block in the Player
 /// component (+0x214, or +0x22c for the Move skill `0x20002909`) and marks it valid; without it
 /// it also starts the skill locally; with `0x02` and a running action of the same skill it
@@ -89,7 +89,7 @@ impl SkillUseParams {
     }
 }
 
-/// S→C `0x01ae`: acknowledgement of a C→S `UseSkill` (reader `0x142196b80`): header, then
+/// S→C `0x01ae`: acknowledgement of a C→S `UseSkill` (reader `0x142196dd0`): header, then
 /// [`SkillUseParams`] with absolute coordinates and `target_flags | 0x04`.
 ///
 /// Official ordering in the reply batch of a roll: `SprintState` (if the key is down),
@@ -117,9 +117,9 @@ impl Message for UseSkillAck {
     }
 }
 
-/// S→C `0x01af`: acknowledgement of C→S `UpdateSkillTarget` `0x01a8` (reader `0x141f7c040`):
+/// S→C `0x01af`: acknowledgement of C→S `UpdateSkillTarget` `0x01a8` (reader `0x141f7c290`):
 /// header, `i32 x, i32 y` (absolute grid cell = the server's player cell + the relative offset
-/// the client sent), `u32 skill`. Client handler `0x141de1a80`
+/// the client sent), `u32 skill`. Client handler `0x141de1cd0`
 /// (`Player_ApplyServerSkillTarget`): stores the position in the pending skill slot whose skill
 /// matches, then re-targets the running action of that skill (Actor vfunc +0x128). This is how
 /// official servers steer a running roll or held skill; they never send `0x01cb`.
@@ -149,7 +149,7 @@ impl Message for UpdateSkillTargetAck {
 }
 
 /// S→C `0x01b0`: acknowledgement of C→S `UpdateSkillTargetEntity` `0x01aa` (reader
-/// `0x142196c60`): header, `u32 entity, i32 x, i32 y` (the entity's absolute cell), `u32
+/// `0x142196eb0`): header, `u32 entity, i32 x, i32 y` (the entity's absolute cell), `u32
 /// skill`. Same client handler as [`UpdateSkillTargetAck`] with the entity set.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct UpdateSkillTargetEntityAck {
@@ -178,7 +178,7 @@ impl Message for UpdateSkillTargetEntityAck {
     }
 }
 
-/// C→S `0x01ac`: the player's held skill input ended (sender `0x14211f110`): `u8 local
+/// C→S `0x01ac`: the player's held skill input ended (sender `0x14211f360`): `u8 local
 /// player`. Sent when the dodge/sprint key is released (together with `SprintInput` held=0)
 /// and when an attack button is released. The client does not apply it itself in lockstep; it
 /// waits for [`SkillInputEndAck`].
@@ -198,8 +198,8 @@ impl Message for SkillInputEnd {
     }
 }
 
-/// S→C `0x01b1`: acknowledgement of [`SkillInputEnd`] (reader `0x141f5a0b0`, header only).
-/// Client handler `0x141de1bd0` (`Player_ClearHeldSkill`): clears both pending skill slots
+/// S→C `0x01b1`: acknowledgement of [`SkillInputEnd`] (reader `0x141f5a300`, header only).
+/// Client handler `0x141de1e20` (`Player_ClearHeldSkill`): clears both pending skill slots
 /// (+0x214, +0x22c) and, unless the Player flags say otherwise, ends the held action. Header
 /// `(player, 0, 0, 0)`; `u1a` was 4 or 10 in a few official replies.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -221,7 +221,7 @@ impl Message for SkillInputEndAck {
 }
 
 /// S→C `0x01b2`: acknowledgement of C→S `SkillReleased` `0x01ad` (`u8 player, u32 skill, u8`):
-/// header, `u32 skill, u8` (client handler `0x141de1cc0`, `Player_ApplyServerSkillRelease`:
+/// header, `u32 skill, u8` (client handler `0x141de1f10`, `Player_ApplyServerSkillRelease`:
 /// clears the slot of that skill; for the Move skill it also ends the click walk). Header
 /// `(player, 0, 0, 6)` in all four official samples.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -247,7 +247,7 @@ impl Message for SkillReleasedAck {
     }
 }
 
-/// S→C `0x01ec`: a buff is removed (reader `0x141f7acc0`): header, `u16 buff index` (the
+/// S→C `0x01ec`: a buff is removed (reader `0x141f7af10`): header, `u16 buff index` (the
 /// index given in [`BuffAdded`]). The sprint buffs 4 and 5 (by index within the entity) are
 /// removed together with the sprint `StatsUpdate`s.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -271,7 +271,7 @@ impl Message for BuffRemoved {
     }
 }
 
-/// S→C `0x01eb`: a buff is added (reader `0x141f7a710`): header, `u16 index` (slot id chosen
+/// S→C `0x01eb`: a buff is added (reader `0x141f7a960`): header, `u16 index` (slot id chosen
 /// by the server, grows per buff), `u16 buff row` (BuffDefinitions row; the sprint buffs are
 /// 2758 = `0xac6`, 2737 = `0xab1`, 2853 = `0xb25`), `u32`, `u16`, `u16 flags`, then optional
 /// fields by flag in this order: `0x01` varuint + u32 + u8 + u16; `0x02` u32 (f32 duration;

@@ -96,7 +96,7 @@ required_features = [
 
 # What the server learns about the client. The client sends no version string; the 32-byte
 # `client_hash` of 0x0003/0x0005 is a SHA-256 of the executable file (LoginClientHash_Get32,
-# 0x1420f6950). Other builds are refused
+# 0x1420f6ba0). Other builds are refused
 # ([security] allow_unknown_client = false) with BackendErrors `InvalidProtocolVersion`.
 [client]
 hashes = ["dfc10ef7e4e4411df7418779c5467d804def225e80814be6ee88f96cbd10dcca"]
