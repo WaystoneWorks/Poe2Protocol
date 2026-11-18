@@ -1,4 +1,4 @@
-# HNC side channel of the instance connection (client 0.5.5g).
+# HNC side channel of the instance connection (client 0.5.5h).
 #
 # The EnableEncryption handler (0x142131660) builds, from the same 64-byte key material as the
 # packet ciphers (InstanceDetails +0x60), a second Salsa20 pair for an anti-cheat side channel

@@ -1,6 +1,6 @@
-# Instance protocol opcodes for client 0.5.5g (u16, big-endian on the wire).
+# Instance protocol opcodes for client 0.5.5h (u16, big-endian on the wire).
 # Client incoming factory: 0x1421802c0 (switch on opcode - 0x0d); full opcode -> class
-# table: dumps/0.5.5g/ghidra/instance_factory_s2c.json (local, git-ignored;
+# table: dumps/0.5.5h/ghidra/instance_factory_s2c.json (local, git-ignored;
 # regenerate with scripts/re/dump_factory.py). Game-session handler: 0x142131590.
 
 [client]

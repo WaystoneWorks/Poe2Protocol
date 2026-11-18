@@ -1,4 +1,4 @@
-//! Instance channel messages (client 0.5.5g). See `docs/protocol/instance.md`.
+//! Instance channel messages (client 0.5.5h). See `docs/protocol/instance.md`.
 
 use poe_net::{DecodeError, Reader, Writer};
 
